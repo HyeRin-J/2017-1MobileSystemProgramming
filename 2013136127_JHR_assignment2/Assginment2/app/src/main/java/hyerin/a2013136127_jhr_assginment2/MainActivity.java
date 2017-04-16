@@ -16,25 +16,22 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import static hyerin.a2013136127_jhr_assginment2.EncounterMonitor.getDate;
+
 public class MainActivity extends AppCompatActivity {
-
-    boolean isBTPermitted = false;
     boolean isESPermitted = false;
-    final int MY_PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION = 1;
-    final int MY_PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 2;
-
-    TextFileManager mFileMgr;
+    final int MY_PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 1;
 
     BluetoothAdapter mBTAdapter;
     BluetoothManager mBTManager;
     static final int REQUEST_ENABLE_BT = 1;
     static final int REQUEST_ENABLE_DISCOVER = 2;
     TextView logText, encountText;
-    String btName;
-    String userName;
+    String btName = "";
+    String userName = "";
     EditText bt;
     EditText user;
-
+    TextFileManager mFileMgr;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,12 +39,15 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         requestRuntimePermission();
+        requestRuntimePermission();
 
         logText = (TextView)findViewById(R.id.logText);
         encountText = (TextView)findViewById(R.id.EncountText);
         bt = (EditText)findViewById(R.id.btName);
         user = (EditText)findViewById(R.id.userName);
+        mFileMgr = new TextFileManager();
 
+        if(!mFileMgr.load().equals(""))     encountText.setText(mFileMgr.load());
         // Bluetooth Adapter 얻기 ========================//
         // 1. BluetoothManager 통해서
         mBTManager = (BluetoothManager)getSystemService(BLUETOOTH_SERVICE);
@@ -113,22 +113,31 @@ public class MainActivity extends AppCompatActivity {
     // 레이아웃 파일 activity_main.xml 파일에서 해당 버튼의 onClick 속성 값으로 지정되어 있는 상태
     public void onClick(View view) {
         if(view.getId() == R.id.regiBtn) {
-            Toast.makeText(this, "BT 디바이스와 사용자 이름 등록!!", Toast.LENGTH_LONG).show();
-
             // EditText에 입력된 디바이스와 사용자 이름을 String 변수에 담음
             btName = bt.getText().toString();
             userName = user.getText().toString();
-
+            if(btName.equals("") || userName.equals("")) {
+                Toast.makeText(this, "BT 디바이스, 또는 사용자 이름을 입력해주세요.", Toast.LENGTH_LONG).show();
+            }else   Toast.makeText(this, "BT 디바이스와 사용자 이름 등록!!", Toast.LENGTH_LONG).show();
         } else if(view.getId() == R.id.startMonitorBtn) {
             // 등록된 BT 디바이스 이름을 주기적으로 검색하여 등록된 사용자와 encounter 모니터를 시작한다
             // 모니터를 수행하는 것은 Service로 구현
             // Service를 EncounterMonitor라는 이름의 클래스로 구현하고 startService로 이 Service를 시작
             // 위에서 모니터링 등록을 한 BT 디바이스 이름을 intent에 담아서 전달
-            Intent intent = new Intent(this, EncounterMonitor.class);
-            intent.putExtra("BTName", btName);
-            intent.putExtra("UserName", userName);
+            if(btName.equals("") || userName.equals("")){
+                Toast.makeText(this, "등록이 되어 있지 않습니다.", Toast.LENGTH_LONG).show();
+            } else {
+                Intent intent = new Intent(this, EncounterMonitor.class);
+                intent.putExtra("BTName", btName);
+                intent.putExtra("UserName", userName);
 
-            startService(intent);
+                if(mFileMgr.load().equals("")){
+                    String data = "모니터링 시작 - " + getDate() + "\n";
+                    mFileMgr.save(data);
+                }
+
+                startService(intent);
+            }
         } else if(view.getId() == R.id.stopMonitorBtn) {
             stopService(new Intent(this, EncounterMonitor.class));
         }
@@ -151,33 +160,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestRuntimePermission() {
-        //*******************************************************************
-        // Runtime permission check
-        //*******************************************************************
-        if (ContextCompat.checkSelfPermission(MainActivity.this,
-                Manifest.permission.ACCESS_COARSE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-
-            // Should we show an explanation?
-            if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this,
-                    Manifest.permission.ACCESS_COARSE_LOCATION)) {
-
-                // Show an expanation to the user *asynchronously* -- don't block
-                // this thread waiting for the user's response! After the user
-                // sees the explanation, try again to request the permission.
-
-            } else {
-
-                // No explanation needed, we can request the permission.
-
-                ActivityCompat.requestPermissions(MainActivity.this,
-                        new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},
-                        MY_PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION);
-            }
-        } else {
-            // ACCESS_COARSE_LOCATION 권한이 있는 것
-            isBTPermitted = true;
-        }
         if (ContextCompat.checkSelfPermission(MainActivity.this,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -209,31 +191,6 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode,
                                            String permissions[], int[] grantResults) {
         switch (requestCode) {
-            case MY_PERMISSIONS_REQUEST_ACCESS_COARSE_LOCATION: {
-                // If request is cancelled, the result arrays are empty.
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-
-                    // permission was granted, yay! Do the
-                    // read_external_storage-related task you need to do.
-
-                    // ACCESS_COARSE_LOCATION 권한을 얻음
-                    isBTPermitted = true;
-
-                } else {
-
-                    // permission denied, boo! Disable the
-                    // functionality that depends on this permission.
-
-                    // 권한을 얻지 못 하였으므로 location 요청 작업을 수행할 수 없다
-                    // 적절히 대처한다
-                    isBTPermitted = false;
-
-                }
-                return;
-            }
-            // other 'case' lines to check for other
-            // permissions this app might request
             case MY_PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE: {
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0
@@ -244,7 +201,6 @@ public class MainActivity extends AppCompatActivity {
 
                     // WRITE_EXTERNAL_STORAGE 권한을 얻음
                     isESPermitted = true;
-
                 } else {
 
                     // permission denied, boo! Disable the
@@ -253,10 +209,9 @@ public class MainActivity extends AppCompatActivity {
                     // 권한을 얻지 못 하였으므로 location 요청 작업을 수행할 수 없다
                     // 적절히 대처한다
                     isESPermitted = false;
-
                 }
-                return;
             }
+            return;
         }
     }
 }

@@ -12,6 +12,8 @@ import android.os.Vibrator;
 import android.util.Log;
 import android.widget.Toast;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -22,6 +24,7 @@ public class EncounterMonitor extends Service {
     String btName;
     String userName;
     boolean isEncountering = false;
+    TextFileManager mFileMgr;
 
     Timer timer = new Timer();
     TimerTask timerTask = null;
@@ -33,7 +36,7 @@ public class EncounterMonitor extends Service {
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-
+            mFileMgr = new TextFileManager();
             if (action.equals(BluetoothAdapter.ACTION_DISCOVERY_STARTED)) {
                 // discovery 시작됨
                 // 아래는 toast 메시지 표시하는 코드
@@ -47,12 +50,22 @@ public class EncounterMonitor extends Service {
                     // 검색된 디바이스 이름이 등록된 디바이스 이름과 같으면
                     // 진동과 Toast 메시지 표시
                     vib.vibrate(200);
+                    String data = "User Name : " + userName + "Encounter Time : " + getDate() + "\n";
+                    mFileMgr.save(data);
                     Toast.makeText(getApplicationContext(), "You encounter " + userName,
                             Toast.LENGTH_LONG).show();
                 }
             }
         }
     };
+
+    /*현재 시간*/
+    public static String getDate(){
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+        Date date = new Date();
+        String strDate = dateFormat.format(date);
+        return strDate;
+    }
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -97,6 +110,9 @@ public class EncounterMonitor extends Service {
     public void onDestroy() {
         Toast.makeText(this, "EncounterMonitor 중지", Toast.LENGTH_SHORT).show();
         Log.d(TAG, "onDestroy()");
+
+        String data = "\n모니터링 종료 - " + getDate();
+        mFileMgr.save(data);
 
         stopTimerTask();
         unregisterReceiver(mReceiver);
